@@ -115,10 +115,6 @@ class GNN_model(nn.Module):
         # gnn on the rest cudas
         if "egnn" == self.args.gnn:
             self.GNN_model = EGNN(self.gnn_config, self.args, self.input_dim, self.out_dim)
-        elif "gcn" == self.args.gnn:
-            self.GNN_model = GCN(self.gnn_config, self.input_dim, self.out_dim)
-        elif "gat" == self.args.gnn:
-            self.GNN_model = GAT(self.gnn_config,self.input_dim, self.out_dim)
         else:
             raise KeyError(f"No implement of {self.opt['gnn']}")
         self.GNN_model = self.GNN_model.cuda()
@@ -341,18 +337,19 @@ class ProtssnClassification(nn.Module):
     def forward(self, batch):
         with torch.no_grad():
             batch_graph = self.plm_model(batch)
+            embeds = batch_graph.esm_rep
             _, embeds = self.gnn_model(batch_graph)
-        
+            
         graph_sizes = torch.unique(batch_graph.batch, return_counts=True)[1]  
         max_nodes = graph_sizes.max().item()
         batch_size = len(graph_sizes)
         padded_embeds = torch.zeros(batch_size, max_nodes, embeds.shape[-1]).to(embeds.device)
-        attention_mask = torch.zeros(batch_size, max_nodes, dtype=torch.bool).to(embeds.device)
+        attention_mask = torch.zeros(batch_size, max_nodes).to(embeds.device)
         start_idx = 0  
         for i, size in enumerate(graph_sizes):  
             end_idx = start_idx + size  
             padded_embeds[i, :size] = embeds[start_idx:end_idx]  
-            attention_mask[i, :size] = True  
+            attention_mask[i, :size] = 1  
             start_idx = end_idx
         
         out = self.pooling_head(padded_embeds, attention_mask)

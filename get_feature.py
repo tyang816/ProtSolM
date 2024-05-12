@@ -1,10 +1,13 @@
 import os
 import sys
-
+import argparse
+import mdtraj as md
+import pandas as pd
+import biotite.structure.io as bsio
 sys.path.append(os.getcwd())
 from Bio import PDB
+from tqdm import tqdm
 from src.utils.data_utils import extract_seq_from_pdb
-import mdtraj as md
 
 ss_alphabet = ['H', 'E', 'C']
 ss_alphabet_dic = {
@@ -49,6 +52,9 @@ def generate_feature(pdb_file):
     final_feature["ss3_seq"] = sec_structure_str_3
     final_feature["rsa"] = rsa
     final_feature["hbonds_num"] = hbonds[0].nnz
+    
+    struct = bsio.load_structure(pdb_file, extra_fields=["b_factor"])
+    final_feature["pLDDT"] = struct.b_factor.mean()
 
     return final_feature, None
 
@@ -98,6 +104,7 @@ def properties_from_dssp(features):
     total_residues = len(ss8_seq)
     name = features["name"]
     h_num = features["hbonds_num"]
+    plddt = features["pLDDT"]
 
     ss8_counts = {"G": 0, "H": 0, "I": 0, "B": 0, "E": 0, "T": 0, "S": 0, "P": 0, "L": 0}
     ss3_counts = {"H": 0, "E": 0, "C": 0}
@@ -147,6 +154,7 @@ def properties_from_dssp(features):
         f"Exposed residues fraction by 90%": exposed_residues[17] / total_residues,
         f"Exposed residues fraction by 95%": exposed_residues[18] / total_residues,
         f"Exposed residues fraction by 100%": exposed_residues[19] / total_residues,
+        "pLDDT": plddt,
         "protein name": name
     }
 
@@ -154,15 +162,33 @@ def properties_from_dssp(features):
 
 
 if __name__ == '__main__':
-    pdb_file = 'data/esmfold_pdb/protein_1.ef.pdb'
-    features, error = generate_feature(pdb_file)
-    properties_seq = properties_from_sequence(features)
-    properties_dssp = properties_from_dssp(features)
-    if error:
-        print(error)
-    else:
-        properties = {}
-        properties.update(properties_seq)
-        properties.update(properties_dssp)
-        print(properties)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pdb_file', type=str)
+    parser.add_argument('--pdb_dir', type=str)
+    parser.add_argument('--out_file', type=str)
+    args = parser.parse_args()
+    
+    os.makedirs(os.path.dirname(args.out_file), exist_ok=True)
+    
+    property_dict = {}
+    pdb_files = os.listdir(args.pdb_dir)[:10]
+    for pdb_file in tqdm(pdb_files):
+        features, error = generate_feature(os.path.join(args.pdb_dir, pdb_file))
+        properties_seq = properties_from_sequence(features)
+        properties_dssp = properties_from_dssp(features)
+        
+        property_names = list(properties_seq.keys()) + list(properties_dssp.keys())
+        for name in property_names:
+            if name not in property_dict:
+                property_dict[name] = []
+        
+        if error:
+            print(error)
+        else:
+            properties = {}
+            properties.update(properties_seq)
+            properties.update(properties_dssp)
+            for key, value in properties.items():
+                property_dict[key].append(value)
+    pd.DataFrame(property_dict).to_csv(args.out_file, index=False)
 
