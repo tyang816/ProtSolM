@@ -7,6 +7,7 @@ import biotite.structure.io as bsio
 sys.path.append(os.getcwd())
 from Bio import PDB
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.utils.data_utils import extract_seq_from_pdb
 
 ss_alphabet = ['H', 'E', 'C']
@@ -165,30 +166,37 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pdb_file', type=str)
     parser.add_argument('--pdb_dir', type=str)
+    parser.add_argument('--num_workers', type=int, default=12)
     parser.add_argument('--out_file', type=str)
     args = parser.parse_args()
     
     os.makedirs(os.path.dirname(args.out_file), exist_ok=True)
     
     property_dict = {}
-    pdb_files = os.listdir(args.pdb_dir)[:10]
-    for pdb_file in tqdm(pdb_files):
+    pdb_files = os.listdir(args.pdb_dir)
+    
+    def process_pdb(pdb_file):
         features, error = generate_feature(os.path.join(args.pdb_dir, pdb_file))
         properties_seq = properties_from_sequence(features)
         properties_dssp = properties_from_dssp(features)
         
-        property_names = list(properties_seq.keys()) + list(properties_dssp.keys())
-        for name in property_names:
-            if name not in property_dict:
-                property_dict[name] = []
-        
         if error:
-            print(error)
-        else:
-            properties = {}
-            properties.update(properties_seq)
-            properties.update(properties_dssp)
-            for key, value in properties.items():
-                property_dict[key].append(value)
+            return None
+
+        properties = {}
+        properties.update(properties_seq)
+        properties.update(properties_dssp)
+        return properties
+
+    with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
+        futures = [executor.submit(process_pdb, pdb) for pdb in pdb_files]
+        for future in tqdm(as_completed(futures), total=len(pdb_files)):
+            properties = future.result()
+            if property is not None:
+                for k, v in properties.items():
+                    if k not in property_dict:
+                        property_dict[k] = []
+                    property_dict[k].append(v)
+    
     pd.DataFrame(property_dict).to_csv(args.out_file, index=False)
 
