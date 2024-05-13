@@ -326,9 +326,19 @@ class ProtssnClassification(nn.Module):
         self.plm_model = plm_model
         self.gnn_model = gnn_model
         if args.pooling_method == "mean":
-            self.pooling_head = MeanPoolingHead(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
+            self.pooling = MeanPooling()
+            if args.feature_name:
+                hidden_dim = args.plm_hidden_size + args.feature_dim
+                self.projection = MeanPoolingProjection(hidden_dim, args.num_labels, args.pooling_dropout)
+            else:
+                self.projection = MeanPoolingProjection(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
         elif args.pooling_method == "attention1d":
-            self.pooling_head = Attention1dPoolingHead(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
+            self.pooling = Attention1dPooling(args.plm_hidden_size)
+            if args.feature_name:
+                hidden_dim = args.plm_hidden_size + args.feature_dim
+                self.projection = Attention1dPoolingProjection(hidden_dim, args.num_labels, args.pooling_dropout)
+            else:
+                self.projection = Attention1dPoolingProjection(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
         elif args.pooling_method == "light_attention":
             self.pooling_head = LightAttentionPoolingHead(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
         else:
@@ -337,8 +347,16 @@ class ProtssnClassification(nn.Module):
     def forward(self, batch):
         with torch.no_grad():
             batch_graph = self.plm_model(batch)
-            embeds = batch_graph.esm_rep
+            esm_embeds = batch_graph.esm_rep
             _, embeds = self.gnn_model(batch_graph)
+        
+        if self.args.use_plddt_penalty:
+            plddt = batch_graph.feature[:, -1]
+            num_repeats = torch.bincount(batch_graph.batch)
+            plddt = plddt.repeat_interleave(num_repeats).view(-1, 1)
+            embeds = esm_embeds + plddt * embeds
+        else:
+            embeds = esm_embeds + embeds
             
         graph_sizes = torch.unique(batch_graph.batch, return_counts=True)[1]  
         max_nodes = graph_sizes.max().item()
@@ -352,6 +370,15 @@ class ProtssnClassification(nn.Module):
             attention_mask[i, :size] = 1  
             start_idx = end_idx
         
-        out = self.pooling_head(padded_embeds, attention_mask)
+        if self.args.pooling_method == "light_attention":
+            out = self.pooling_head(padded_embeds, attention_mask)
+        else:
+            pooled_embeds = self.pooling(padded_embeds, attention_mask)
+            if self.args.feature_name:
+                feature = batch_graph.feature
+                pooled_embeds = torch.cat([pooled_embeds, feature], dim=1)
+                out = self.projection(pooled_embeds)
+            else:
+                out = self.projection(pooled_embeds)
         
         return out
