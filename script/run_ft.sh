@@ -17,7 +17,7 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --c_alpha_max_neighbors $K \
     --learning_rate 5e-4 \
     --num_train_epochs 10 \
-    --batch_token_num 25000 \
+    --batch_token_num 16000 \
     --gradient_accumulation_steps 1 \
     --patience 3 \
     --wandb \
@@ -27,8 +27,8 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
 K=20
 H=512
 pooling_method=mean
-model_name=protssn_feature_"$pooling_method"_k"$K"_h"$H"
-CUDA_VISIBLE_DEVICES=5 python run_ft.py \
+model_name=feature_pp_"$pooling_method"_k"$K"_h"$H"
+CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --seed 3407 \
     --gnn_hidden_dim $H \
     --gnn_model_path model/protssn_k"$K"_h"$H".pt \
@@ -46,7 +46,7 @@ CUDA_VISIBLE_DEVICES=5 python run_ft.py \
     --c_alpha_max_neighbors $K \
     --learning_rate 5e-4 \
     --num_train_epochs 10 \
-    --batch_token_num 25000 \
+    --batch_token_num 16000 \
     --gradient_accumulation_steps 1 \
     --patience 3 \
     --wandb \

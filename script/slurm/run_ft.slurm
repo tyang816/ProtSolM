@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --c_alpha_max_neighbors $K \
     --learning_rate 5e-4 \
     --num_train_epochs 10 \
-    --batch_token_num 20000 \
+    --batch_token_num 16000 \
     --gradient_accumulation_steps 1 \
     --patience 3 \
     --wandb \

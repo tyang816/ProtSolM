@@ -23,7 +23,7 @@ from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from accelerate.utils import set_seed
 from accelerate import Accelerator
-from torchmetrics.classification import Accuracy
+from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCorrCoef, AUROC
 from src.models import ProtssnClassification, PLM_model, GNN_model
 from src.utils.data_utils import BatchSampler
 from src.utils.utils import param_num, total_param_num
@@ -64,7 +64,7 @@ class StepRunner:
     def step(self, batch):        
         if self.stage == "train":
             with self.accelerator.accumulate(self.model):
-                logits = self.model(batch).cuda()
+                logits = self.model(plm_model, gnn_model, batch).cuda()
                 label = torch.cat([data.label for data in batch]).to(logits.device)
                 loss = self.loss_fn(logits, label)
                 self.accelerator.backward(loss)
@@ -75,7 +75,7 @@ class StepRunner:
                     self.scheduler.step()  # Update learning rate schedule
                 self.optimizer.zero_grad()
         else:
-            logits = self.model(batch).cuda()
+            logits = self.model(plm_model, gnn_model, batch).cuda()
             label = torch.cat([data.label for data in batch]).to(logits.device)
             loss = self.loss_fn(logits, label)
         
@@ -118,8 +118,9 @@ class EpochRunner:
             loop.set_postfix(**step_log)
             total_loss += step_loss
         
+        epoch_metric_results = {}
         for name, metric_fn in metrics_dict.items():
-            epoch_metric_results = {f"{self.stage}/{name}": metric_fn.compute().item()}
+            epoch_metric_results[f"{self.stage}/{name}"] = metric_fn.compute().item()
             metric_fn.reset()
         avg_loss = total_loss / len(dataloader)
         epoch_metric_results[f"{self.stage}/epoch_loss"] = avg_loss
@@ -137,7 +138,7 @@ def train_model(args, model,
     if args.auto_continue_train:
         history_df = pd.read_csv(os.path.join(args.model_dir, "history.csv"))
         names = history_df.columns
-        model.pooling_head.load_state_dict(torch.load(model_path)["state_dict"])
+        model.load_state_dict(torch.load(model_path)["state_dict"])
         if args.epoch_idx:
             logger.info(f" Train from epoch_idx = {args.epoch_idx} ")
         else:
@@ -192,7 +193,7 @@ def train_model(args, model,
         best_score_idx = np.argmax(arr_scores) if mode == "max" else np.argmin(arr_scores)
         if best_score_idx == len(arr_scores) - 1:
             torch.save({
-                "state_dict": model.pooling_head.state_dict(),
+                "state_dict": model.state_dict(),
                 "epoch": epoch,
                 "history": history,
                 }, model_path)
@@ -207,6 +208,7 @@ def train_model(args, model,
         
         # 4，test -------------------------------------------------
         if test_data:
+            model.load_state_dict(torch.load(model_path)["state_dict"])
             test_step_runner = StepRunner(
                 args=args, stage="test", model=model, 
                 loss_fn=loss_fn, accelerator=accelerator,
@@ -429,10 +431,12 @@ if __name__ == "__main__":
     
     logger.info("***** Load Model *****")
     # load model
-    plm_model = PLM_model(args)
-    gnn_model = GNN_model(args)
+    global plm_model
+    plm_model = PLM_model(args).to(device)
+    global gnn_model
+    gnn_model = GNN_model(args).to(device)
     gnn_model.load_state_dict(torch.load(args.gnn_model_path))
-    protssn_classification = ProtssnClassification(args, plm_model, gnn_model)
+    protssn_classification = ProtssnClassification(args)
     protssn_classification.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     
@@ -452,7 +456,11 @@ if __name__ == "__main__":
         protssn_classification, optimizer, train_dataloader, valid_dataloader, test_dataloader
     )
     metrics_dict = {
-        "acc": Accuracy(task="multiclass", num_classes=args.num_labels).to(device)
+        "acc": Accuracy(task="multiclass", num_classes=args.num_labels).to(device),
+        "recall": Recall(task="multiclass", num_classes=args.num_labels).to(device),
+        "precision": Precision(task="multiclass", num_classes=args.num_labels).to(device),
+        "mcc": MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels).to(device),
+        # "auroc": AUROC(task="multiclass", num_classes=args.num_labels).to(device),
     }
     
     os.makedirs(args.model_dir, exist_ok=True)    

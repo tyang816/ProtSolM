@@ -320,11 +320,9 @@ class LightAttentionPoolingHead(nn.Module):
 
 
 class ProtssnClassification(nn.Module):
-    def __init__(self, args, plm_model, gnn_model):
+    def __init__(self, args):
         super().__init__()
         self.args = args
-        self.plm_model = plm_model
-        self.gnn_model = gnn_model
         if args.pooling_method == "mean":
             self.pooling = MeanPooling()
             if args.feature_name:
@@ -344,11 +342,11 @@ class ProtssnClassification(nn.Module):
         else:
             raise KeyError(f"No implement of {args.pooling_method}")
         
-    def forward(self, batch):
+    def forward(self, plm_model, gnn_model, batch):
         with torch.no_grad():
-            batch_graph = self.plm_model(batch)
+            batch_graph = plm_model(batch)
             esm_embeds = batch_graph.esm_rep
-            _, embeds = self.gnn_model(batch_graph)
+            _, embeds = gnn_model(batch_graph)
         
         if self.args.use_plddt_penalty:
             plddt = batch_graph.feature[:, -1]
