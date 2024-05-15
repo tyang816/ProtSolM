@@ -26,9 +26,9 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
 
 K=20
 H=512
-pooling_method=mean
-model_name=feature_pp_"$pooling_method"_k"$K"_h"$H"
-CUDA_VISIBLE_DEVICES=0 python run_ft.py \
+pooling_method=attention1d
+model_name=feature_"$pooling_method"_k"$K"_h"$H"
+CUDA_VISIBLE_DEVICES=1 python run_ft.py \
     --seed 3407 \
     --gnn_hidden_dim $H \
     --gnn_model_path model/protssn_k"$K"_h"$H".pt \
@@ -42,7 +42,6 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --test_file data/sol/test.csv \
     --feature_file data/sol/sol_feature.csv \
     --feature_name "aa_composition" "gravy" "ss_composition" "hygrogen_bonds" "exposed_res_fraction" "pLDDT" \
-    --use_plddt_penalty \
     --c_alpha_max_neighbors $K \
     --learning_rate 5e-4 \
     --num_train_epochs 10 \
@@ -52,3 +51,8 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --wandb \
     --wandb_project protssn-sol_debug \
     --wandb_run_name $model_name
+
+for i in {9065..9076}
+do
+    scancel $i
+done

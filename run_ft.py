@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from accelerate.utils import set_seed
 from accelerate import Accelerator
 from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCorrCoef, AUROC
+from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef
 from src.models import ProtssnClassification, PLM_model, GNN_model
 from src.utils.data_utils import BatchSampler
 from src.utils.utils import param_num, total_param_num
@@ -82,7 +83,7 @@ class StepRunner:
         # compute metrics
         if self.metrics_dict and self.stage != "train":
             for name, metric_fn in self.metrics_dict.items():
-                metric_fn.update(logits, label)
+                metric_fn.update(torch.argmax(logits, 1), label)
         return loss.item(), self.model, self.metrics_dict
 
     def train_step(self, batch):
@@ -119,9 +120,10 @@ class EpochRunner:
             total_loss += step_loss
         
         epoch_metric_results = {}
-        for name, metric_fn in metrics_dict.items():
-            epoch_metric_results[f"{self.stage}/{name}"] = metric_fn.compute().item()
-            metric_fn.reset()
+        if self.stage != "train":
+            for name, metric_fn in metrics_dict.items():
+                epoch_metric_results[f"{self.stage}/{name}"] = metric_fn.compute().item()
+                metric_fn.reset()
         avg_loss = total_loss / len(dataloader)
         epoch_metric_results[f"{self.stage}/epoch_loss"] = avg_loss
         return model, epoch_metric_results
@@ -456,11 +458,17 @@ if __name__ == "__main__":
         protssn_classification, optimizer, train_dataloader, valid_dataloader, test_dataloader
     )
     metrics_dict = {
-        "acc": Accuracy(task="multiclass", num_classes=args.num_labels).to(device),
-        "recall": Recall(task="multiclass", num_classes=args.num_labels).to(device),
-        "precision": Precision(task="multiclass", num_classes=args.num_labels).to(device),
-        "mcc": MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels).to(device),
+        # "acc": Accuracy(task="multiclass", num_classes=args.num_labels).to(device),
+        # "recall": Recall(task="multiclass", num_classes=args.num_labels).to(device),
+        # "precision": Precision(task="multiclass", num_classes=args.num_labels).to(device),
+        # "mcc": MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels).to(device),
         # "auroc": AUROC(task="multiclass", num_classes=args.num_labels).to(device),
+        "acc": BinaryAccuracy().to(device),
+        "recall": BinaryRecall().to(device),
+        "precision": BinaryPrecision().to(device),
+        "mcc": BinaryMatthewsCorrCoef().to(device),
+        "auroc": BinaryAUROC().to(device),
+        "f1": BinaryF1Score().to(device),
     }
     
     os.makedirs(args.model_dir, exist_ok=True)    
