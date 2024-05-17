@@ -270,6 +270,7 @@ def create_parser():
     
     # log
     parser.add_argument("--wandb", action="store_true", help="use wandb")
+    parser.add_argument("--wandb_entity", type=str, default=None, help="wandb entity name")
     parser.add_argument("--wandb_project", type=str, default="protssn", help="wandb project name")
     parser.add_argument("--wandb_run_name", type=str, default=None, help="wandb run name")
 
@@ -292,7 +293,8 @@ if __name__ == "__main__":
         if args.model_name is None:
             args.model_name = f"{args.wandb_run_name}.pt"
         
-        wandb.init(project=args.wandb_project, name=args.wandb_run_name, config=vars(args))
+        wandb.init(project=args.wandb_project, name=args.wandb_run_name, 
+                   entity=args.entity, config=vars(args))
     
     if args.feature_file:
         logger.info("***** Loading Feature *****")

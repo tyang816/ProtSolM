@@ -43,5 +43,6 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --gradient_accumulation_steps 1 \
     --patience 3 \
     --wandb \
+    --wandb_entity ty_ang \
     --wandb_project $project_name \
     --wandb_run_name $model_name
