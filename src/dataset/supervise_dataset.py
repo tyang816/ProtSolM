@@ -170,7 +170,9 @@ class SuperviseDataset(Dataset):
         process_bar = tqdm(exist_proteins)
         for protein in process_bar:
             process_bar.set_description(f"Processing {protein}")
-            
+            saved_prcessed_name = os.path.join(self.processed_dir, protein)
+            if os.path.exists(saved_prcessed_name) and not self.replace_process:
+                continue
             graph_data = torch.load(os.path.join(self.saved_graph_path, protein))
             
             if self.pre_filter is not None:
@@ -183,7 +185,6 @@ class SuperviseDataset(Dataset):
             del graph_data['edge_dist']
             del graph_data['mu_r_norm']
             
-            saved_prcessed_name = os.path.join(self.processed_dir, protein)
             torch.save(graph_data, saved_prcessed_name)
 
     def generate_protein_graph_evaluation(self):

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J sol
 #SBATCH -p NvidiaA800
-#SBATCH --nodelist=ZSGPU15
+#SBATCH --nodelist=ZSGPU10
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1 
 #SBATCH --cpus-per-task=16
@@ -10,7 +10,8 @@
 #SBATCH --output=/public/home/tanyang/workspace/sol/log/%j.out
 #SBATCH --error=/public/home/tanyang/workspace/sol/log/%j.err
 
-source ~/.bashrc
+source ~/.zshrc
+zsh
 conda activate protssn
 cd /public/home/tanyang/workspace/sol
 export NCCL_IB_DISABLE=0
@@ -19,7 +20,7 @@ export OMP_PROC_BIND=false
 
 pooling_method=mean
 model_name=protssn_"$pooling_method"_k"$K"_h"$H"
-project_name=protssn-sol
+project_name=protssn-sol_v2
 
 CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --seed 3407 \

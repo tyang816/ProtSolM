@@ -294,7 +294,7 @@ if __name__ == "__main__":
             args.model_name = f"{args.wandb_run_name}.pt"
         
         wandb.init(project=args.wandb_project, name=args.wandb_run_name, 
-                   entity=args.entity, config=vars(args))
+                   entity=args.wandb_entity, config=vars(args))
     
     if args.feature_file:
         logger.info("***** Loading Feature *****")
