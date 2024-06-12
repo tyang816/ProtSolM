@@ -326,17 +326,30 @@ class ProtssnClassification(nn.Module):
         if args.pooling_method == "mean":
             self.pooling = MeanPooling()
             if args.feature_name:
-                hidden_dim = args.plm_hidden_size + args.feature_dim
+                if args.feature_embed_dim is None:
+                    hidden_dim = args.plm_hidden_size + args.feature_dim
+                else:
+                    hidden_dim = args.plm_hidden_size + args.feature_embed_dim
+                    self.feature_embed_layer = nn.Linear(args.feature_dim, args.feature_embed_dim)
                 self.projection = MeanPoolingProjection(hidden_dim, args.num_labels, args.pooling_dropout)
             else:
                 self.projection = MeanPoolingProjection(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
+                
         elif args.pooling_method == "attention1d":
             self.pooling = Attention1dPooling(args.plm_hidden_size)
             if args.feature_name:
-                hidden_dim = args.plm_hidden_size + args.feature_dim
+                if args.feature_embed_dim is None:
+                    hidden_dim = args.plm_hidden_size + args.feature_dim
+                    self.batch_norm1 = nn.BatchNorm1d(args.feature_dim)
+                else:
+                    self.feature_embed_layer = nn.Linear(args.feature_dim, args.feature_embed_dim)
+                    hidden_dim = args.plm_hidden_size + args.feature_embed_dim
+                    self.batch_norm1 = nn.BatchNorm1d(args.feature_dim)
+                    self.batch_norm2 = nn.BatchNorm1d(args.feature_embed_dim)
                 self.projection = Attention1dPoolingProjection(hidden_dim, args.num_labels, args.pooling_dropout)
             else:
                 self.projection = Attention1dPoolingProjection(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
+                
         elif args.pooling_method == "light_attention":
             self.pooling_head = LightAttentionPoolingHead(args.plm_hidden_size, args.num_labels, args.pooling_dropout)
         else:
@@ -374,6 +387,10 @@ class ProtssnClassification(nn.Module):
             pooled_embeds = self.pooling(padded_embeds, attention_mask)
             if self.args.feature_name:
                 feature = batch_graph.feature
+                feature = self.batch_norm1(feature)
+                if self.args.feature_embed_dim is not None:
+                    feature = self.feature_embed_layer(feature)
+                    feature = self.batch_norm2(feature)
                 pooled_embeds = torch.cat([pooled_embeds, feature], dim=1)
                 out = self.projection(pooled_embeds)
             else:

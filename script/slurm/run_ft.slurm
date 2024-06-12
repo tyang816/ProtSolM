@@ -18,8 +18,8 @@ export NCCL_IB_DISABLE=0
 export NCCL_DEBUG=INFO
 export OMP_PROC_BIND=false
 
-pooling_method=mean
-model_name=protssn_"$pooling_method"_k"$K"_h"$H"
+pooling_method=attention1d
+model_name="$pooling_method"_k"$K"_h"$H"
 project_name=protssn-sol_v2
 
 CUDA_VISIBLE_DEVICES=0 python run_ft.py \

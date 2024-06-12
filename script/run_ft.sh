@@ -1,13 +1,15 @@
 K=20
 H=512
+lr=5e-4
 pooling_method=mean
-model_name=protssn_"$pooling_method"_k"$K"_h"$H"
+model_name="$pooling_method"_k"$K"_h"$H"_lr"$lr"
+project_name=protssn-sol_v2
 CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --seed 3407 \
     --gnn_hidden_dim $H \
     --gnn_model_path model/protssn_k"$K"_h"$H".pt \
     --pooling_method $pooling_method \
-    --model_dir result/sol/debug/protssn_k"$K"_h"$H" \
+    --model_dir result/$project_name/protssn_k"$K"_h"$H" \
     --model_name $model_name.pt \
     --num_labels 2 \
     --supv_dataset data/sol \
@@ -16,12 +18,13 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --test_file data/sol/test.csv \
     --c_alpha_max_neighbors $K \
     --learning_rate 5e-4 \
-    --num_train_epochs 10 \
+    --num_train_epochs 30 \
     --batch_token_num 16000 \
     --gradient_accumulation_steps 1 \
-    --patience 3 \
+    --patience 5 \
     --wandb \
-    --wandb_project protssn-sol_debug \
+    --wandb_entity ty_ang \
+    --wandb_project $project_name \
     --wandb_run_name $model_name
 
 K=20

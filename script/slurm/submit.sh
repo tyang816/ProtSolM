@@ -8,7 +8,7 @@ do
     done
 done
 
-for k in 10 20 30
+for k in 20
 do
     for h in 512
     do

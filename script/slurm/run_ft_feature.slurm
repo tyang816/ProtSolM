@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J sol
 #SBATCH -p NvidiaA800
-#SBATCH --nodelist=ZSGPU10
+#SBATCH --nodelist=ZSGPU13
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1 
 #SBATCH --cpus-per-task=16
@@ -18,9 +18,11 @@ export NCCL_IB_DISABLE=0
 export NCCL_DEBUG=INFO
 export OMP_PROC_BIND=false
 
-pooling_method=mean
-model_name=feature_pp_"$pooling_method"_k"$K"_h"$H"
+pooling_method=attention1d
+lr=5e-4
+model_name=feature_norm_pp_"$pooling_method"_k"$K"_h"$H"_lr"$lr"
 project_name=protssn-sol_v2
+#     --feature_embed_dim 512 \
 
 CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --seed 3407 \
@@ -38,11 +40,11 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --feature_name "aa_composition" "gravy" "ss_composition" "hygrogen_bonds" "exposed_res_fraction" "pLDDT" \
     --use_plddt_penalty \
     --c_alpha_max_neighbors $K \
-    --learning_rate 1e-4 \
-    --num_train_epochs 10 \
+    --learning_rate $lr \
+    --num_train_epochs 30 \
     --batch_token_num 16000 \
     --gradient_accumulation_steps 1 \
-    --patience 3 \
+    --patience 5 \
     --wandb \
     --wandb_entity ty_ang \
     --wandb_project $project_name \

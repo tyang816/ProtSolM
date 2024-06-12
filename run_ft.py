@@ -260,6 +260,7 @@ def create_parser():
     parser.add_argument("--feature_file", type=str, default=None, help="feature file")
     parser.add_argument("--feature_name", nargs="+", default=None, help="feature names")
     parser.add_argument("--feature_dim", type=int, default=0, help="feature dim")
+    parser.add_argument("--feature_embed_dim", type=int, default=None, help="feature embed dim")
     parser.add_argument("--use_plddt_penalty", action="store_true", help="use plddt penalty")
     parser.add_argument("--c_alpha_max_neighbors", type=int, default=10, help="graph dataset K")
     parser.add_argument("--gnn_model_path", type=str, default="", help="gnn model path")
