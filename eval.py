@@ -51,37 +51,23 @@ def printlog(info):
 class StepRunner:
     def __init__(self, args, model, 
                  loss_fn, accelerator=None,
-                 stage="train", metrics_dict=None,
-                 optimizer=None, scheduler=None):
+                 metrics_dict=None,
+                 ):
         self.model = model
-        self.metrics_dict, self.stage = metrics_dict, stage
+        self.metrics_dict = metrics_dict
         self.accelerator = accelerator
-        self.optimizer, self.scheduler, self.loss_fn = optimizer, scheduler, loss_fn
+        self.loss_fn = loss_fn
         self.args = args
 
     def step(self, batch):        
-        if self.stage == "train":
-            with self.accelerator.accumulate(self.model):
-                logits = self.model(plm_model, gnn_model, batch).cuda()
-                label = torch.cat([data.label for data in batch]).to(logits.device)
-                loss = self.loss_fn(logits, label)
-                self.accelerator.backward(loss)
-                if self.accelerator.sync_gradients and self.args.max_grad_norm is not None:
-                    self.accelerator.clip_grad_norm_(self.model.pooling_head.parameters(), self.args.max_grad_norm)
-                self.optimizer.step()
-                if self.scheduler is not None:
-                    self.scheduler.step()  # Update learning rate schedule
-                self.optimizer.zero_grad()
-        else:
-            logits = self.model(plm_model, gnn_model, batch).cuda()
-            label = torch.cat([data.label for data in batch]).to(logits.device)
-            loss = self.loss_fn(logits, label)
-        
+        logits = self.model(plm_model, gnn_model, batch).cuda()
+        label = torch.cat([data.label for data in batch]).to(logits.device)
+        pred_labels = logits.argmax(dim=1).cpu().numpy()
+        loss = self.loss_fn(logits, label)
         # compute metrics
-        if self.metrics_dict and self.stage != "train":
-            for name, metric_fn in self.metrics_dict.items():
-                metric_fn.update(torch.argmax(logits, 1), label)
-        return loss.item(), self.model, self.metrics_dict
+        for name, metric_fn in self.metrics_dict.items():
+            metric_fn.update(torch.argmax(logits, 1), label)
+        return loss.item(), self.model, self.metrics_dict, pred_labels
 
     def train_step(self, batch):
         self.model.train()
@@ -93,134 +79,58 @@ class StepRunner:
         return self.step(batch)
 
     def __call__(self, batch):
-        if self.stage == "train":
-            return self.train_step(batch)
-        else:
-            return self.eval_step(batch)
+        return self.eval_step(batch)
 
 
 class EpochRunner:
     def __init__(self, steprunner):
         self.steprunner = steprunner
-        self.stage = steprunner.stage
         self.args = steprunner.args
 
     def __call__(self, dataloader):
         loop = tqdm(dataloader, total=len(dataloader), file=sys.stdout)
         total_loss = 0
+        pred_labels = []
         for batch in loop:
-            step_loss, model, metrics_dict = self.steprunner(batch)
-            step_log = dict({f"{self.stage}/loss": round(step_loss, 3)})
-            if self.args.wandb and self.stage == "train":
-                wandb.log({f"train/loss": step_loss, "train/epoch": self.args.epoch_idx})
+            step_loss, model, metrics_dict, pred_label = self.steprunner(batch)
+            pred_labels.extend(pred_label)
+            step_log = dict({f"eval/loss": round(step_loss, 3)})
             loop.set_postfix(**step_log)
             total_loss += step_loss
         
         epoch_metric_results = {}
-        if self.stage != "train":
-            for name, metric_fn in metrics_dict.items():
-                epoch_metric_results[f"{self.stage}/{name}"] = metric_fn.compute().item()
-                metric_fn.reset()
+        for name, metric_fn in metrics_dict.items():
+            epoch_metric_results[f"eval/{name}"] = metric_fn.compute().item()
+            metric_fn.reset()
         avg_loss = total_loss / len(dataloader)
-        epoch_metric_results[f"{self.stage}/epoch_loss"] = avg_loss
-        return model, epoch_metric_results
+        epoch_metric_results[f"eval/loss"] = avg_loss
+        return model, epoch_metric_results, pred_labels
 
-def train_model(args, model, 
-                optimizer, scheduler, loss_fn, 
+def eval_model(args, model, loss_fn, 
                 accelerator=None, metrics_dict=None, 
-                train_data=None, valid_data=None, test_data=None,
-                monitor="valid/loss", mode="min"):
-    history = {}
-    start_epoch = 1
-    model_path = os.path.join(args.model_dir, args.model_name)
-    logger.info("***** Running training *****")
-    if args.auto_continue_train:
-        history_df = pd.read_csv(os.path.join(args.model_dir, "history.csv"))
-        names = history_df.columns
+                test_data=None,
+                ):
+    model_path = os.path.join(args.model_dir, args.model_name)        
+    if test_data:
         model.load_state_dict(torch.load(model_path)["state_dict"])
-        if args.epoch_idx:
-            logger.info(f" Train from epoch_idx = {args.epoch_idx} ")
-        else:
-            if mode == "min":
-                args.epoch_idx = int(history_df[history_df[monitor] == history_df[monitor].min()]["epoch"])
-            elif mode == "max":
-                args.epoch_idx = int(history_df[history_df[monitor] == history_df[monitor].max()]["epoch"])
-            logger.info(f"  Auto continue to train from epoch_idx = {args.epoch_idx} ")
-        for name in names:
-            history[name] = list(history_df[name][:int(args.epoch_idx)])       
-        start_epoch += args.epoch_idx
-        
-    for epoch in range(start_epoch, args.num_train_epochs + 1):
-        printlog(f"Epoch {epoch} / {args.num_train_epochs}")
-        args.epoch_idx = epoch
-        # 1，train -------------------------------------------------
-        train_step_runner = StepRunner(
-            args=args, stage="train", model=model, 
+        test_step_runner = StepRunner(
+            args=args, model=model, 
             loss_fn=loss_fn, accelerator=accelerator,
             metrics_dict=deepcopy(metrics_dict), 
-            optimizer=optimizer, scheduler=scheduler
             )
-        train_epoch_runner = EpochRunner(train_step_runner)
-        model, epoch_metric_results = train_epoch_runner(train_data)
-
+        test_epoch_runner = EpochRunner(test_step_runner)
+        with torch.no_grad():
+            model, epoch_metric_results, pred_labels = test_epoch_runner(test_data)
         for name, metric in epoch_metric_results.items():
-            history[name] = history.get(name, []) + [metric]
-
-        # 2，validate -------------------------------------------------
-        if valid_data:
-            val_step_runner = StepRunner(
-                args=args, stage="valid", model=model, 
-                loss_fn=loss_fn, accelerator=accelerator,
-                metrics_dict=deepcopy(metrics_dict), 
-                optimizer=optimizer, scheduler=scheduler
-                )
-            val_epoch_runner = EpochRunner(val_step_runner)
-            with torch.no_grad():
-                model, epoch_metric_results = val_epoch_runner(valid_data)
-            
-            if args.wandb:
-                wandb.log({name: metric for name, metric in epoch_metric_results.items()})
-            for name, metric in epoch_metric_results.items():
-                print(f">>> Epoch {epoch} {name}: {'%.3f'%metric}")
-            
-            epoch_metric_results["epoch"] = epoch
-            for name, metric in epoch_metric_results.items():
-                history[name] = history.get(name, []) + [metric]
-
-        # 3，early-stopping -------------------------------------------------
-        arr_scores = history[monitor]
-        best_score_idx = np.argmax(arr_scores) if mode == "max" else np.argmin(arr_scores)
-        if best_score_idx == len(arr_scores) - 1:
-            torch.save({
-                "state_dict": model.state_dict(),
-                "epoch": epoch,
-                "history": history,
-                }, model_path)
-            print(f">>> reach best {monitor} : {'%.3f'%arr_scores[best_score_idx]}")
-        
-        history_df = pd.DataFrame(history)
-        history_df.to_csv(os.path.join(args.model_dir, "history.csv"), index=False)
-        
-        if args.patience > 0 and len(arr_scores) - best_score_idx > args.patience:
-            print(f">>> {monitor} without improvement in {args.patience} epoch, early stopping")
-            break
-        
-        # 4，test -------------------------------------------------
-        if test_data:
-            model.load_state_dict(torch.load(model_path)["state_dict"])
-            test_step_runner = StepRunner(
-                args=args, stage="test", model=model, 
-                loss_fn=loss_fn, accelerator=accelerator,
-                metrics_dict=deepcopy(metrics_dict), 
-                optimizer=optimizer, scheduler=scheduler
-                )
-            test_epoch_runner = EpochRunner(test_step_runner)
-            with torch.no_grad():
-                model, epoch_metric_results = test_epoch_runner(test_data)
-            for name, metric in epoch_metric_results.items():
-                print(f">>> Epoch {epoch} {name}: {'%.3f'%metric}")
-            if args.wandb:
-                wandb.log({name: metric for name, metric in epoch_metric_results.items()})
+            epoch_metric_results[name] = [metric]
+            print(f">>> {name}: {'%.3f'%metric}")
+    
+    if args.test_result_dir:
+        os.makedirs(args.test_result_dir, exist_ok=True)
+        test_df = pd.read_csv(args.test_file)
+        test_df["pred_label"] = pred_labels
+        test_df.to_csv(f"{args.test_result_dir}/test_result.csv", index=False)
+        pd.DataFrame(epoch_metric_results).to_csv(f"{args.test_result_dir}/test_metrics.csv", index=False)
 
 
 def create_parser():
@@ -236,24 +146,17 @@ def create_parser():
     
     # training strategy
     parser.add_argument("--seed", type=int, default=3407, help="random seed")
-    parser.add_argument("--learning_rate", type=float, default=1e-4, help="learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-2, help="weight_decay")
-    parser.add_argument("--num_train_epochs", type=int, default=50, help="number of epochs to train")
-    parser.add_argument("--epoch_idx", type=int, default=0, help="the idx of epoch to continue training")
-    parser.add_argument("--auto_continue_train", action="store_true", help="auto extract epoch idx from history")
     parser.add_argument("--batch_token_num", type=int, default=4096, help="how many tokens in one batch")
     parser.add_argument("--max_graph_token_num", type=int, default=3000, help="max token num a graph has")
-    parser.add_argument("--patience", type=int, default=0, help="early stopping patience")
     parser.add_argument("--max_grad_norm", type=float, default=None, help="clip grad norm")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="gradient accumulation steps")
     
     # dataset
     parser.add_argument("--num_labels", type=int, help="number of labels")
     parser.add_argument("--problem_type", type=str, default="classification", help="classification or regression")
     parser.add_argument("--supv_dataset", type=str, help="supervise protein dataset")
-    parser.add_argument("--train_file", type=str, help="train label file")
-    parser.add_argument("--valid_file", type=str, help="valid label file")
     parser.add_argument("--test_file", type=str, help="test label file")
+    parser.add_argument('--test_result_dir', type=str, default=None, help='test result directory')
     parser.add_argument("--feature_file", type=str, default=None, help="feature file")
     parser.add_argument("--feature_name", nargs="+", default=None, help="feature names")
     parser.add_argument("--feature_dim", type=int, default=0, help="feature dim")
@@ -262,15 +165,9 @@ def create_parser():
     parser.add_argument("--c_alpha_max_neighbors", type=int, default=10, help="graph dataset K")
     parser.add_argument("--gnn_model_path", type=str, default="", help="gnn model path")
     
-    # save model
+    # load model
     parser.add_argument("--model_dir", type=str, default="model", help="model save dir")
     parser.add_argument("--model_name", type=str, default=None, help="model name")
-    
-    # log
-    parser.add_argument("--wandb", action="store_true", help="use wandb")
-    parser.add_argument("--wandb_entity", type=str, default=None, help="wandb entity name")
-    parser.add_argument("--wandb_project", type=str, default="protssn", help="wandb project name")
-    parser.add_argument("--wandb_run_name", type=str, default=None, help="wandb run name")
 
     args = parser.parse_args()
     return args
@@ -283,16 +180,6 @@ if __name__ == "__main__":
     
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # init wandb
-    if args.wandb:
-        if args.wandb_run_name is None:
-            args.wandb_run_name = f"ProtSSN-task"
-        if args.model_name is None:
-            args.model_name = f"{args.wandb_run_name}.pt"
-        
-        wandb.init(project=args.wandb_project, name=args.wandb_run_name, 
-                   entity=args.wandb_entity, config=vars(args))
     
     if args.feature_file:
         logger.info("***** Loading Feature *****")
@@ -379,8 +266,6 @@ if __name__ == "__main__":
             label_dict[name] = label
             node_nums.append(len(seq))
         return names, node_nums
-    train_names, train_node_nums = get_dataset(pd.read_csv(args.train_file))
-    valid_names, valid_node_nums = get_dataset(pd.read_csv(args.valid_file))
     test_names, test_node_nums = get_dataset(pd.read_csv(args.test_file))
     
     
@@ -393,33 +278,13 @@ if __name__ == "__main__":
     
     def collect_fn(batch):
         batch_data = []
-        with ThreadPoolExecutor(max_workers=16) as executor:
+        with ThreadPoolExecutor(max_workers=12) as executor:
             futures = [executor.submit(process_data, name) for name in batch]
             for future in as_completed(futures):
                 graph = future.result()
                 batch_data.append(graph)
         return batch_data
     
-    train_dataloader = DataLoader(
-        dataset=train_names, num_workers=4, 
-        collate_fn=lambda x: collect_fn(x),
-        batch_sampler=BatchSampler(
-            node_num=train_node_nums,
-            max_len=args.max_graph_token_num,
-            batch_token_num=args.batch_token_num,
-            shuffle=True
-            )
-        )
-    valid_dataloader = DataLoader(
-        dataset=valid_names, num_workers=4, 
-        collate_fn=lambda x: collect_fn(x),
-        batch_sampler=BatchSampler(
-            node_num=valid_node_nums,
-            max_len=args.max_graph_token_num,
-            batch_token_num=args.batch_token_num,
-            shuffle=False
-            )
-        )
     test_dataloader = DataLoader(
         dataset=test_names, num_workers=4, 
         collate_fn=lambda x: collect_fn(x),
@@ -448,21 +313,12 @@ if __name__ == "__main__":
         param.requires_grad = False
     logger.info(total_param_num(protssn_classification))
     logger.info(param_num(protssn_classification))
-    optimizer = torch.optim.AdamW(
-        protssn_classification.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
-    )
 
-    scheduler = None
-    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
-    protssn_classification, optimizer, train_dataloader, valid_dataloader, test_dataloader = accelerator.prepare(
-        protssn_classification, optimizer, train_dataloader, valid_dataloader, test_dataloader
+    accelerator = Accelerator()
+    protssn_classification, test_dataloader = accelerator.prepare(
+        protssn_classification, test_dataloader
     )
     metrics_dict = {
-        # "acc": Accuracy(task="multiclass", num_classes=args.num_labels).to(device),
-        # "recall": Recall(task="multiclass", num_classes=args.num_labels).to(device),
-        # "precision": Precision(task="multiclass", num_classes=args.num_labels).to(device),
-        # "mcc": MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels).to(device),
-        # "auroc": AUROC(task="multiclass", num_classes=args.num_labels).to(device),
         "acc": BinaryAccuracy().to(device),
         "recall": BinaryRecall().to(device),
         "precision": BinaryPrecision().to(device),
@@ -471,29 +327,14 @@ if __name__ == "__main__":
         "f1": BinaryF1Score().to(device),
     }
     
-    os.makedirs(args.model_dir, exist_ok=True)    
-    with open(os.path.join(args.model_dir, "config.json"), 'w', encoding='utf-8') as f:
-        json.dump(vars(args), f, ensure_ascii=False)
-    
-    logger.info("***** Running training *****")
-    logger.info("  Num train examples = %d", len(train_names))
-    logger.info("  Num valid examples = %d", len(valid_names))
-    logger.info("  Num Epochs = %d", args.num_train_epochs)
+    logger.info("***** Running eval *****")
+    logger.info("  Num test examples = %d", len(test_names))
     logger.info("  Batch token num = %d", args.batch_token_num)
     
-    logger.info(
-        "  Total train batch token num (w. parallel, distributed & accumulation) = %d",
-        args.batch_token_num
-        * args.gradient_accumulation_steps
-    )
-    logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
-    
-    train_model(
+    eval_model(
         args=args, model=protssn_classification, 
-        optimizer=optimizer, scheduler=scheduler, loss_fn=loss_fn, 
+        loss_fn=loss_fn, 
         accelerator=accelerator, metrics_dict=metrics_dict, 
-        train_data=train_dataloader, valid_data=valid_dataloader, test_data=test_dataloader,
-        monitor="valid/acc", mode="max"
+        test_data=test_dataloader,
         )
-    if args.wandb:
-        wandb.finish()    
+  
