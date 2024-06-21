@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J sol
 #SBATCH -p NvidiaA800
-#SBATCH --nodelist=ZSGPU10
+#SBATCH --nodelist=ZSGPU9
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1 
 #SBATCH --cpus-per-task=16
@@ -20,9 +20,10 @@ export OMP_PROC_BIND=false
 
 pooling_method=attention1d
 lr=5e-4
-model_name=feature_norm_"$pooling_method"_k"$K"_h"$H"_lr"$lr"
+model_name=pp_"$pooling_method"_k"$K"_h"$H"_lr"$lr"
 project_name=protssn-sol_v2
 #     --feature_embed_dim 512 \
+#     --use_plddt_penalty
 
 CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --seed 3407 \
@@ -37,7 +38,7 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --valid_file data/sol/valid.csv \
     --test_file data/sol/test.csv \
     --feature_file data/sol/sol_feature.csv \
-    --feature_name "aa_composition" "gravy" "ss_composition" "hygrogen_bonds" "exposed_res_fraction" "pLDDT" \
+    --feature_name "pLDDT" \
     --c_alpha_max_neighbors $K \
     --learning_rate $lr \
     --num_train_epochs 30 \

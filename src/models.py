@@ -197,11 +197,14 @@ class Attention1dPoolingProjection(nn.Module):
         self.relu = nn.ReLU()
         self.final = nn.Linear(hidden_size, num_labels)
 
-    def forward(self, x):
+    def forward(self, x, return_embed=False):
         x = self.linear(x)
         x = self.dropout(x)
         x = self.relu(x)
+        embed = x
         x = self.final(x)
+        if return_embed:
+            return x, embed
         return x
 
 class Attention1dPoolingHead(nn.Module):
@@ -356,7 +359,7 @@ class ProtssnClassification(nn.Module):
         else:
             raise KeyError(f"No implement of {args.pooling_method}")
         
-    def forward(self, plm_model, gnn_model, batch):
+    def forward(self, plm_model, gnn_model, batch, return_embed=False):
         with torch.no_grad():
             batch_graph = plm_model(batch)
             esm_embeds = batch_graph.esm_rep
@@ -393,8 +396,17 @@ class ProtssnClassification(nn.Module):
                     feature = self.feature_embed_layer(feature)
                     feature = self.batch_norm2(feature)
                 pooled_embeds = torch.cat([pooled_embeds, feature], dim=1)
-                out = self.projection(pooled_embeds)
+                if return_embed:
+                    out, ssn_embeds = self.projection(pooled_embeds, return_embed=True)
+                else:
+                    out = self.projection(pooled_embeds)
             else:
-                out = self.projection(pooled_embeds)
+                if return_embed:
+                    out, ssn_embeds = self.projection(pooled_embeds, return_embed=True)
+                else:
+                    out = self.projection(pooled_embeds)
         
-        return out
+        if return_embed:
+            return out, ssn_embeds
+        else:
+            return out

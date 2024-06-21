@@ -47,7 +47,6 @@ def printlog(info):
     print("\n" + "==========" * 3 + "%s" % nowtime + "==========" * 3)
     print(str(info) + "\n")
 
-
 class StepRunner:
     def __init__(self, args, model, 
                  loss_fn, accelerator=None,
@@ -60,14 +59,15 @@ class StepRunner:
         self.args = args
 
     def step(self, batch):        
-        logits = self.model(plm_model, gnn_model, batch).cuda()
+        logits, ssn_emebds = self.model(plm_model, gnn_model, batch, True)
+        logits = logits.cuda()
         label = torch.cat([data.label for data in batch]).to(logits.device)
-        pred_labels = logits.argmax(dim=1).cpu().numpy()
+        pred_labels = torch.argmax(logits, 1).cpu().numpy()
         loss = self.loss_fn(logits, label)
         # compute metrics
         for name, metric_fn in self.metrics_dict.items():
             metric_fn.update(torch.argmax(logits, 1), label)
-        return loss.item(), self.model, self.metrics_dict, pred_labels
+        return loss.item(), self.model, self.metrics_dict, pred_labels, ssn_emebds
 
     def train_step(self, batch):
         self.model.train()
@@ -90,25 +90,30 @@ class EpochRunner:
     def __call__(self, dataloader):
         loop = tqdm(dataloader, total=len(dataloader), file=sys.stdout)
         total_loss = 0
-        pred_labels = []
+        result_dict = {'name':[], 'sequence':[], 'label':[], 'pred_label':[]}
+        ssn_embeds = []
         for batch in loop:
-            step_loss, model, metrics_dict, pred_label = self.steprunner(batch)
-            pred_labels.extend(pred_label)
+            step_loss, model, metrics_dict, pred_label, ssn_embed = self.steprunner(batch)
+            result_dict["pred_label"].extend(pred_label)
+            result_dict["name"].extend([data.name for data in batch])
+            result_dict["sequence"].extend([data.sequence for data in batch])
+            result_dict["label"].extend([data.label.item() for data in batch])
+            ssn_embeds.append(ssn_embed)
             step_log = dict({f"eval/loss": round(step_loss, 3)})
             loop.set_postfix(**step_log)
             total_loss += step_loss
-        
+        ssn_embeds = torch.cat(ssn_embeds, dim=0)
         epoch_metric_results = {}
         for name, metric_fn in metrics_dict.items():
             epoch_metric_results[f"eval/{name}"] = metric_fn.compute().item()
             metric_fn.reset()
         avg_loss = total_loss / len(dataloader)
         epoch_metric_results[f"eval/loss"] = avg_loss
-        return model, epoch_metric_results, pred_labels
+        return model, epoch_metric_results, result_dict, ssn_embeds
 
 def eval_model(args, model, loss_fn, 
                 accelerator=None, metrics_dict=None, 
-                test_data=None,
+                test_data=None
                 ):
     model_path = os.path.join(args.model_dir, args.model_name)        
     if test_data:
@@ -120,18 +125,16 @@ def eval_model(args, model, loss_fn,
             )
         test_epoch_runner = EpochRunner(test_step_runner)
         with torch.no_grad():
-            model, epoch_metric_results, pred_labels = test_epoch_runner(test_data)
+            model, epoch_metric_results, result_dict, ssn_embeds = test_epoch_runner(test_data)
         for name, metric in epoch_metric_results.items():
             epoch_metric_results[name] = [metric]
             print(f">>> {name}: {'%.3f'%metric}")
     
     if args.test_result_dir:
         os.makedirs(args.test_result_dir, exist_ok=True)
-        test_df = pd.read_csv(args.test_file)
-        test_df["pred_label"] = pred_labels
-        test_df.to_csv(f"{args.test_result_dir}/test_result.csv", index=False)
+        pd.DataFrame(result_dict).to_csv(f"{args.test_result_dir}/test_result.csv", index=False)
         pd.DataFrame(epoch_metric_results).to_csv(f"{args.test_result_dir}/test_metrics.csv", index=False)
-
+        torch.save(ssn_embeds, f"{args.test_result_dir}/ssn_embeds.pt")
 
 def create_parser():
     parser = argparse.ArgumentParser()
@@ -258,20 +261,24 @@ if __name__ == "__main__":
         ),
     )
 
-    label_dict = {}
+    label_dict, seq_dict = {}, {}
     def get_dataset(df):
         names, node_nums = [], []
         for name, label, seq in zip(df["name"], df["label"], df["sequence"]):
             names.append(name)
             label_dict[name] = label
+            seq_dict[name] = seq
             node_nums.append(len(seq))
         return names, node_nums
     test_names, test_node_nums = get_dataset(pd.read_csv(args.test_file))
     
-    
+    # multi-thread load data will shuffle the order of data
+    # so we need to save the information
     def process_data(name):
         data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{name}.pt")
         data.label = torch.tensor(label_dict[name]).view(1)
+        data.sequence = seq_dict[name]
+        data.name = name
         if args.feature_file:
             data.feature = torch.tensor(feature_dict[name]).view(1, -1)
         return data
@@ -335,6 +342,6 @@ if __name__ == "__main__":
         args=args, model=protssn_classification, 
         loss_fn=loss_fn, 
         accelerator=accelerator, metrics_dict=metrics_dict, 
-        test_data=test_dataloader,
+        test_data=test_dataloader
         )
-  
+    
