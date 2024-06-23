@@ -161,6 +161,14 @@ cython_debug/
 
 model/
 result/
-data/
+data/*
+!data/PDBSol/
+data/PDBSol/esmfold_pdb/
+!data/PDBSol/*.csv
+
+!data/ExternalTest/
+data/ExternalTest/esmfold_pdb/
+!data/ExternalTest/*.csv
+
 wandb/
 log/
