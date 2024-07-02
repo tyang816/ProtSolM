@@ -165,10 +165,12 @@ data/*
 !data/PDBSol/
 data/PDBSol/esmfold_pdb/
 !data/PDBSol/*.csv
+data/PDBSol/*.zip
 
 !data/ExternalTest/
 data/ExternalTest/esmfold_pdb/
 !data/ExternalTest/*.csv
+data/ExternalTest/*.zip
 
 wandb/
 log/
