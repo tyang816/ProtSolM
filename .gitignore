@@ -174,3 +174,4 @@ data/ExternalTest/*.zip
 
 wandb/
 log/
+script_tmp/
