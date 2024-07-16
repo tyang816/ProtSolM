@@ -20,11 +20,11 @@ The labels are stored in CSV files which can be found at `data/PDBSol` and `data
 
 ```shell
 cd data/PDBSol
-wget https://huggingface.co/datasets/tyang816/ProtFactory-PDB/resolve/main/ProtSolM/PDBSol_ESMFold_PDB.zip
+wget https://huggingface.co/datasets/tyang816/ProtSolM_PDB/blob/main/ExternalTest_ESMFold_PDB.zip
 unzip PDBSol_ESMFold_PDB.zip
 
 cd data/ExternalTest
-wget https://huggingface.co/datasets/tyang816/ProtFactory-PDB/resolve/main/ProtSolM/ExternalTest_ESMFold_PDB.zip
+wget https://huggingface.co/datasets/tyang816/ProtSolM_PDB/blob/main/ExternalTest_ESMFold_PDB.zip
 unzip ExternalTest_ESMFold_PDB.zip
 ```
 
