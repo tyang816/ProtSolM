@@ -164,11 +164,17 @@ result/
 data/*
 !data/PDBSol/
 data/PDBSol/esmfold_pdb/
+data/PDBSol/Pdbsol_k10/
+data/PDBSol/Pdbsol_k20/
+data/PDBSol/Pdbsol_k30/
 !data/PDBSol/*.csv
 data/PDBSol/*.zip
 
 !data/ExternalTest/
 data/ExternalTest/esmfold_pdb/
+data/ExternalTest/Externaltest_k10/
+data/ExternalTest/Externaltest_k20/
+data/ExternalTest/Externaltest_k30/
 !data/ExternalTest/*.csv
 data/ExternalTest/*.zip
 
