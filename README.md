@@ -45,20 +45,20 @@ We use the pre-trained checkpoints from [ProtSSN](https://github.com/tyang816/Pr
 
 | # Version | # Param | # Link                                                       |
 | --------- | ------- | ------------------------------------------------------------ |
-| k10_h512  | 148     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k10_h512.pt |
-| k10_h768  | 160     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k10_h768.pt |
-| k10_h1280 | 184     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k10_h1280.pt |
-| k20_h512  | 148     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k20_h512.pt |
-| k20_h768  | 160     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k20_h768.pt |
-| k20_h1280 | 184     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k20_h1280.pt |
-| k30_h512  | 148     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k30_h512.pt |
-| k30_h768  | 160     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k30_h768.pt |
-| k30_h1280 | 184     | https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k30_h1280.pt |
+| k10_h512  | 148     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k10_h512.pt |
+| k10_h768  | 160     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k10_h768.pt |
+| k10_h1280 | 184     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k10_h1280.pt |
+| k20_h512  | 148     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k20_h512.pt |
+| k20_h768  | 160     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k20_h768.pt |
+| k20_h1280 | 184     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k20_h1280.pt |
+| k30_h512  | 148     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k30_h512.pt |
+| k30_h768  | 160     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k30_h768.pt |
+| k30_h1280 | 184     | https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k30_h1280.pt |
 
 ```shell
 mkdir model
 cd model
-wget https://lianglab.sjtu.edu.cn/files/ProtSSN-2024/model/protssn_k20_h512.pt
+wget https://huggingface.co/tyang816/ProtSSN/resolve/main/protssn_k20_h512.pt
 ```
 
 ### Extract Features
