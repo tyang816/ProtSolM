@@ -8,6 +8,10 @@ Fusion of **sequence, structure and feature** information to improve protein sol
 
 ## 📑 Results
 
+### News
+
+- [2024.07.31] Congratulations! Our paper was accepted as a short paper at *IEEE International Conference on Bioinformatics and Biomedicine 2024 (IEEE BIBM 2024)*!
+
 ### Paper Results
 
 <img src="img/result.png" alt="result">
