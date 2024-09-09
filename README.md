@@ -136,3 +136,16 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
     --wandb_project protssn-sol_debug \
     --wandb_run_name $model_name
 ```
+
+## 🙌 Citation
+
+Please cite our work if you have used our code or data. We are pleased to see improvements in the subsequent work.
+
+```
+@article{tan2024protsolm,
+  title={ProtSolM: Protein Solubility Prediction with Multi-modal Features},
+  author={Tan, Yang and Zheng, Jia and Hong, Liang and Zhou, Bingxin},
+  journal={arXiv preprint arXiv:2406.19744},
+  year={2024}
+}
+```
