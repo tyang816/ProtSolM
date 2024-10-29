@@ -90,13 +90,13 @@ class EpochRunner:
     def __call__(self, dataloader):
         loop = tqdm(dataloader, total=len(dataloader), file=sys.stdout)
         total_loss = 0
-        result_dict = {'name':[], 'sequence':[], 'label':[], 'pred_label':[]}
+        result_dict = {'name':[], 'aa_seq':[], 'label':[], 'pred_label':[]}
         ssn_embeds = []
         for batch in loop:
             step_loss, model, metrics_dict, pred_label, ssn_embed = self.steprunner(batch)
             result_dict["pred_label"].extend(pred_label)
             result_dict["name"].extend([data.name for data in batch])
-            result_dict["sequence"].extend([data.sequence for data in batch])
+            result_dict["aa_seq"].extend([data.aa_seq for data in batch])
             result_dict["label"].extend([data.label.item() for data in batch])
             ssn_embeds.append(ssn_embed)
             step_log = dict({f"eval/loss": round(step_loss, 3)})
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     label_dict, seq_dict = {}, {}
     def get_dataset(df):
         names, node_nums = [], []
-        for name, label, seq in zip(df["name"], df["label"], df["sequence"]):
+        for name, label, seq in zip(df["name"], df["label"], df["aa_seq"]):
             names.append(name)
             label_dict[name] = label
             seq_dict[name] = seq
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     def process_data(name):
         data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{name}.pt")
         data.label = torch.tensor(label_dict[name]).view(1)
-        data.sequence = seq_dict[name]
+        data.aa_seq = seq_dict[name]
         data.name = name
         if args.feature_file:
             data.feature = torch.tensor(feature_dict[name]).view(1, -1)
