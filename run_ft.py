@@ -231,7 +231,7 @@ def create_parser():
     parser.add_argument("--gnn_hidden_dim", type=int, default=512, help="hidden size of gnn")
     parser.add_argument("--plm", type=str, default="facebook/esm2_t33_650M_UR50D", help="esm param number")
     parser.add_argument("--plm_hidden_size", type=int, default=1280, help="hidden size of plm")
-    parser.add_argument("--pooling_method", type=str, default="mean", help="pooling method")
+    parser.add_argument("--pooling_method", type=str, default="attention1d", help="pooling method")
     parser.add_argument("--pooling_dropout", type=float, default=0.1, help="pooling dropout")
     
     # training strategy
@@ -263,7 +263,7 @@ def create_parser():
     parser.add_argument("--gnn_model_path", type=str, default="", help="gnn model path")
     
     # save model
-    parser.add_argument("--model_dir", type=str, default="model", help="model save dir")
+    parser.add_argument("--model_dir", type=str, default="ckpt", help="model save dir")
     parser.add_argument("--model_name", type=str, default=None, help="model name")
     
     # log

@@ -144,7 +144,7 @@ def create_parser():
     parser.add_argument("--gnn_hidden_dim", type=int, default=512, help="hidden size of gnn")
     parser.add_argument("--plm", type=str, default="facebook/esm2_t33_650M_UR50D", help="esm param number")
     parser.add_argument("--plm_hidden_size", type=int, default=1280, help="hidden size of plm")
-    parser.add_argument("--pooling_method", type=str, default="mean", help="pooling method")
+    parser.add_argument("--pooling_method", type=str, default="attention1d", help="pooling method")
     parser.add_argument("--pooling_dropout", type=float, default=0.1, help="pooling dropout")
     
     # training strategy
@@ -155,7 +155,7 @@ def create_parser():
     parser.add_argument("--max_grad_norm", type=float, default=None, help="clip grad norm")
     
     # dataset
-    parser.add_argument("--num_labels", type=int, help="number of labels")
+    parser.add_argument("--num_labels", type=int, default=2, help="number of labels")
     parser.add_argument("--problem_type", type=str, default="classification", help="classification or regression")
     parser.add_argument("--supv_dataset", type=str, help="supervise protein dataset")
     parser.add_argument("--test_file", type=str, help="test label file")
@@ -163,14 +163,14 @@ def create_parser():
     parser.add_argument("--feature_file", type=str, default=None, help="feature file")
     parser.add_argument("--feature_name", nargs="+", default=None, help="feature names")
     parser.add_argument("--feature_dim", type=int, default=0, help="feature dim")
-    parser.add_argument("--feature_embed_dim", type=int, default=None, help="feature embed dim")
+    parser.add_argument("--feature_embed_dim", type=int, default=512, help="feature embed dim")
     parser.add_argument("--use_plddt_penalty", action="store_true", help="use plddt penalty")
-    parser.add_argument("--c_alpha_max_neighbors", type=int, default=10, help="graph dataset K")
-    parser.add_argument("--gnn_model_path", type=str, default="", help="gnn model path")
+    parser.add_argument("--c_alpha_max_neighbors", type=int, default=20, help="graph dataset K")
+    parser.add_argument("--gnn_model_path", type=str, default="model/protssn_k20_h512.pt", help="gnn model path")
     
     # load model
-    parser.add_argument("--model_dir", type=str, default="model", help="model save dir")
-    parser.add_argument("--model_name", type=str, default=None, help="model name")
+    parser.add_argument("--model_dir", type=str, default="ckpt", help="model save dir")
+    parser.add_argument("--model_name", type=str, default="feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt", help="model name")
 
     args = parser.parse_args()
     return args

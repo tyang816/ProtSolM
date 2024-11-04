@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 model/
+model
 result/
 data/*
 !data/PDBSol/
@@ -181,3 +182,4 @@ data/ExternalTest/*.zip
 wandb/
 log/
 script_tmp/
+script_dev/
