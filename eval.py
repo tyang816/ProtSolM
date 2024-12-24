@@ -249,7 +249,12 @@ if __name__ == "__main__":
     # load dataset
     logger.info("***** Loading Dataset *****")
     datatset_name = args.supv_dataset.split("/")[-1]
-    pdb_dir = f"{args.supv_dataset}/esmfold_pdb"
+    if os.path.exists(f"{args.supv_dataset}/esmfold_pdb"):
+        pdb_dir = f"{args.supv_dataset}/esmfold_pdb"
+    elif os.path.exists(f"{args.supv_dataset}/pdb"):
+        pdb_dir = f"{args.supv_dataset}/pdb"
+    else:
+        raise ValueError("No pdb or esmfold_pdb directory found in the dataset")
     graph_dir = f"{datatset_name}_k{args.c_alpha_max_neighbors}"
     supervise_dataset = SuperviseDataset(
         root=args.supv_dataset,
