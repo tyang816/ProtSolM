@@ -4,7 +4,6 @@ lr=5e-4
 pooling_method=attention1d
 model_name=feature512_norm_pp_"$pooling_method"_k"$K"_h"$H"_lr"$lr"
 CUDA_VISIBLE_DEVICES=0 python eval.py \
-    --seed 3407 \
     --gnn_hidden_dim $H \
     --gnn_model_path model/protssn_k"$K"_h"$H".pt \
     --pooling_method $pooling_method \
@@ -27,7 +26,6 @@ lr=5e-4
 pooling_method=attention1d
 model_name=feature512_norm_pp_"$pooling_method"_k"$K"_h"$H"_lr"$lr"
 CUDA_VISIBLE_DEVICES=0 python eval.py \
-    --seed 3407 \
     --gnn_hidden_dim $H \
     --gnn_model_path model/protssn_k"$K"_h"$H".pt \
     --pooling_method $pooling_method \

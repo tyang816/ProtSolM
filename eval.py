@@ -4,13 +4,11 @@ import torch
 import os
 import sys
 import yaml
-import wandb
 import datetime
 import logging
 import numpy as np
 import pandas as pd
 import transformers
-import json
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from typing import *
@@ -166,15 +164,16 @@ def create_parser():
     parser.add_argument("--feature_embed_dim", type=int, default=512, help="feature embed dim")
     parser.add_argument("--use_plddt_penalty", action="store_true", help="use plddt penalty")
     parser.add_argument("--c_alpha_max_neighbors", type=int, default=20, help="graph dataset K")
-    parser.add_argument("--gnn_model_path", type=str, default="model/protssn_k20_h512.pt", help="gnn model path")
+    parser.add_argument("--gnn_model_path", type=str, default="./model/protssn_k20_h512.pt", help="gnn model path")
     
     # load model
-    parser.add_argument("--model_dir", type=str, default="ckpt", help="model save dir")
+    parser.add_argument("--model_dir", type=str, default="./ckpt", help="model save dir")
     parser.add_argument("--model_name", type=str, default="feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt", help="model name")
 
     args = parser.parse_args()
     return args
 
+feature_dict ={}
 
 if __name__ == "__main__":
     args = create_parser()
@@ -190,7 +189,7 @@ if __name__ == "__main__":
         if type(args.feature_name) != list:
             args.feature_name = [args.feature_name]
         
-        feature_dict = {}
+
         feature_aa_composition = ["1-C", "1-D", "1-E", "1-R", "1-H", "Turn-forming residues fraction"]
         if "aa_composition" in args.feature_name:
             aa_composition_df = feature_df[feature_aa_composition]
@@ -279,19 +278,27 @@ if __name__ == "__main__":
     
     # multi-thread load data will shuffle the order of data
     # so we need to save the information
-    def process_data(name):
+    def process_data(name, fd):
         data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{name}.pt")
         data.label = torch.tensor(label_dict[name]).view(1)
         data.aa_seq = seq_dict[name]
         data.name = name
+        fe = None
         if args.feature_file:
-            data.feature = torch.tensor(feature_dict[name]).view(1, -1)
+            for key, value in fd.items():
+                if key == str(name):
+                    fe = value
+     
+        if fe is None:
+            print(f'\'{name}\'')
+        data.feature = torch.tensor(fe).view(1, -1)
         return data
     
     def collect_fn(batch):
         batch_data = []
         with ThreadPoolExecutor(max_workers=12) as executor:
-            futures = [executor.submit(process_data, name) for name in batch]
+            feature_d =deepcopy(feature_dict)
+            futures = [executor.submit(process_data, name, feature_d) for name in batch]
             for future in as_completed(futures):
                 graph = future.result()
                 batch_data.append(graph)
