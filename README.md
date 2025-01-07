@@ -1,6 +1,6 @@
 # ProtSolM: Protein Solubility Prediction with Multi-modal Features
 
-## 🚀 Introduction (ProtSolM)
+## 🚀 Introduction (Venus-ProtSolM/ ProtSolM)
 
 Fusion of **sequence, structure and feature** information to improve protein solubility prediction!
 
