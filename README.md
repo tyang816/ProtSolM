@@ -12,7 +12,7 @@ Fusion of **sequence, structure and feature** information to improve protein sol
 
 - [2024.11.04] I have updated the code and [README file](https://github.com/tyang816/ProtSolM?tab=readme-ov-file#your-own-dataset) to support your own dataset, please have a try!
 
-- [2024.08.22] Congratulations! Our paper was accepted as a short paper at *IEEE International Conference on Bioinformatics and Biomedicine 2024 (IEEE BIBM 2024)*!
+- [2024.08.22] Congratulations! Our paper was accepted at [*IEEE International Conference on Bioinformatics and Biomedicine 2024 (IEEE BIBM 2024)*](https://ieeexplore.ieee.org/document/10822310)!
 
 ### Paper Results
 
