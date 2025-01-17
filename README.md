@@ -163,10 +163,12 @@ CUDA_VISIBLE_DEVICES=0 python run_ft.py \
 Please cite our work if you have used our code or data. We are pleased to see improvements in the subsequent work.
 
 ```
-@article{tan2024protsolm,
-  title={ProtSolM: Protein Solubility Prediction with Multi-modal Features},
+@inproceedings{tan2024protsolm,
+  title={Protsolm: Protein solubility prediction with multi-modal features},
   author={Tan, Yang and Zheng, Jia and Hong, Liang and Zhou, Bingxin},
-  journal={arXiv preprint arXiv:2406.19744},
-  year={2024}
+  booktitle={2024 IEEE International Conference on Bioinformatics and Biomedicine (BIBM)},
+  pages={223--232},
+  year={2024},
+  organization={IEEE}
 }
 ```
